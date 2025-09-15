@@ -1,0 +1,112 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python specific
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Package files
+*.tgz
+*.tar.gz
+
+# Local configuration
+.local/
+.config/
+
+# Backup files
+*.bak
+*.backup
+
+# Supabase
+.supabase/
+
+# Railway
+.railway/
+
+# Vercel
+.vercel/
+
+# Redis dump file
+dump.rdb
+
+# Ollama models (optional - these can be large)
+# .ollama/
