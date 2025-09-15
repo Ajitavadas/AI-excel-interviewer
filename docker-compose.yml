@@ -1,98 +1,56 @@
 version: '3.8'
-
 services:
-  # PostgreSQL Database with pgvector (for local development)
+  backend:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    container_name: ai-excel-interviewer-backend
+    working_dir: /app/backend
+    volumes:
+      - ./backend:/app/backend
+      - ./backend/app:/app/backend/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    command: ["python", "main.py"]
+
   postgres:
-    image: pgvector/pgvector:pg15
-    container_name: ai-interviewer-db
+    image: postgres:15
+    container_name: ai-excel-interviewer-postgres
+    restart: always
     environment:
-      POSTGRES_DB: ai_interviewer
+      POSTGRES_DB: ai_excel_interviewer
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
-  # Redis for session management (optional for local dev)
   redis:
-    image: redis:7-alpine
-    container_name: ai-interviewer-redis
+    image: redis:7
+    container_name: ai-excel-interviewer-redis
+    restart: always
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
 
-  # Ollama for local LLM (free alternative to OpenAI)
   ollama:
     image: ollama/ollama:latest
-    container_name: ai-interviewer-ollama
+    container_name: ai-excel-interviewer-ollama
+    restart: always
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_KEEP_ALIVE=24h
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Backend API
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: ai-interviewer-backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_interviewer
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - USE_LOCAL_LLM=true
-      - DEBUG=true
-      - REDIS_URL=redis://redis:6379
-    volumes:
-      - ./backend:/app
-      - /app/venv
-    depends_on:
-      postgres:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  # Frontend (for local development)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: ai-interviewer-frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
 
 volumes:
   postgres_data:
   redis_data:
   ollama_data:
-
-networks:
-  default:
-    driver: bridge
