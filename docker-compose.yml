@@ -1,56 +1,122 @@
 version: '3.8'
+
 services:
+  # Backend API Service
   backend:
     build:
-      context: ./
-      dockerfile: ./Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: ai-excel-interviewer-backend
-    working_dir: /app/backend
-    volumes:
-      - ./backend:/app/backend
-      - ./backend/app:/app/backend/app
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_excel_interviewer
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - USE_LOCAL_LLM=true
+      - OLLAMA_MODEL=phi4-mini:latest
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - ./backend:/app/backend
+      - ./logs:/app/logs
     depends_on:
-      - postgres
-      - redis
-      - ollama
-    command: ["python", "main.py"]
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - ai-excel-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: ai-excel-interviewer-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - ai-excel-network
+
+  # PostgreSQL Database with pgvector
   postgres:
-    image: postgres:15
+    image: ankane/pgvector:v0.5.0
     container_name: ai-excel-interviewer-postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ai_excel_interviewer
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - ai-excel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_excel_interviewer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis Cache
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: ai-excel-interviewer-redis
-    restart: always
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - ai-excel-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
+  # Ollama LLM Service
   ollama:
     image: ollama/ollama:latest
     container_name: ai-excel-interviewer-ollama
-    restart: always
+    restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
+    networks:
+      - ai-excel-network
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    # Note: Model pulling handled in init script
 
+# Networks
+networks:
+  ai-excel-network:
+    driver: bridge
+
+# Volumes
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
   ollama_data:
+    driver: local

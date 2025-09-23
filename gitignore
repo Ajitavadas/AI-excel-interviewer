@@ -110,3 +110,7 @@ dump.rdb
 
 # Ollama models (optional - these can be large)
 # .ollama/
+
+docker-fix-guide.md
+docker-implementation-guide.md
+FRONTEND_SETUP_README.md

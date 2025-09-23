@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app/backend
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    command: ["python", "backend/main.py", "--reload"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    environment:
+      - NODE_ENV=development
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    ports:
+      - "5173:5173"
