@@ -1,180 +1,225 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getQuestion, submitAnswer, getSessionStatus } from '../utils/api';
-import { Clock, Send, CheckCircle } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const InterviewPage = () => {
-  const { sessionId } = useParams();
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function InterviewPage() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [answer, setAnswer] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [timeElapsed, setTimeElapsed] = useState(0);
-  const [sessionComplete, setSessionComplete] = useState(false);
+  const { sessionId, welcomeMessage, candidateEmail } = location.state || {};
+
+  const [messages, setMessages] = useState([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadNextQuestion();
-    const timer = setInterval(() => {
-      setTimeElapsed(prev => prev + 1);
-    }, 1000);
+    if (!sessionId) {
+      navigate('/');
+      return;
+    }
 
-    return () => clearInterval(timer);
-  }, [sessionId]);
+    // Add welcome message
+    if (welcomeMessage) {
+      setMessages([{
+        type: 'ai',
+        content: welcomeMessage,
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  }, [sessionId, welcomeMessage, navigate]);
 
-  const loadNextQuestion = async () => {
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!currentMessage.trim() || loading) return;
+
+    const userMessage = currentMessage.trim();
+    setCurrentMessage('');
+    setLoading(true);
+    setError('');
+
+    // Add user message to chat
+    const newUserMessage = {
+      type: 'user',
+      content: userMessage,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, newUserMessage]);
+
     try {
-      setLoading(true);
-      const question = await getQuestion(sessionId);
+      console.log('Sending message:', { sessionId, message: userMessage });
+      
+      const response = await axios.post(`${API_BASE_URL}/api/interviews/chat/message`, {
+        session_id: sessionId,
+        message: userMessage
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000
+      });
 
-      if (question) {
-        setCurrentQuestion(question);
-        setAnswer('');
-      } else {
-        // No more questions, interview is complete
-        setSessionComplete(true);
-      }
-    } catch (error) {
-      console.error('Failed to load question:', error);
-      // Check if session is complete
-      try {
-        const status = await getSessionStatus(sessionId);
-        if (status.status === 'completed') {
-          setSessionComplete(true);
-        }
-      } catch (statusError) {
-        console.error('Failed to check session status:', statusError);
-      }
+      console.log('AI response:', response.data);
+
+      // Add AI response to chat
+      const aiMessage = {
+        type: 'ai',
+        content: response.data.response,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError(
+        err.response?.data?.detail || 
+        err.message || 
+        'Failed to send message. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmitAnswer = async (e) => {
-    e.preventDefault();
-    if (!answer.trim()) {
-      alert('Please provide an answer');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await submitAnswer(sessionId, currentQuestion.id, answer);
-      // Load next question
-      await loadNextQuestion();
-    } catch (error) {
-      console.error('Failed to submit answer:', error);
-      alert('Failed to submit answer. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+  const finishInterview = () => {
+    navigate('/results', { 
+      state: { 
+        sessionId,
+        candidateEmail 
+      }
+    });
   };
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleCompleteInterview = () => {
-    navigate(`/results/${sessionId}`);
-  };
-
-  if (sessionComplete) {
-    return (
-      <div className="interview-container">
-        <div className="completion-card">
-          <CheckCircle size={64} className="completion-icon" />
-          <h2>Interview Complete!</h2>
-          <p>Thank you for completing the AI Excel Interview.</p>
-          <p>Time taken: {formatTime(timeElapsed)}</p>
-          <button 
-            onClick={handleCompleteInterview}
-            className="results-button"
-          >
-            View Results
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="interview-container">
-        <div className="loading-card">
-          <div className="spinner"></div>
-          <p>Loading your next question...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentQuestion) {
-    return (
-      <div className="interview-container">
-        <div className="error-card">
-          <h2>Question Not Available</h2>
-          <p>Unable to load the next question. Please try refreshing the page.</p>
-          <button onClick={() => window.location.reload()}>
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
+  if (!sessionId) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <div className="interview-container">
-      <div className="interview-header">
-        <div className="session-info">
-          <h1>Excel Interview</h1>
-          <div className="timer">
-            <Clock size={16} />
-            {formatTime(timeElapsed)}
-          </div>
-        </div>
-      </div>
+    <div style={{ 
+      maxWidth: '800px', 
+      margin: '0 auto', 
+      padding: '1rem',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <header style={{ 
+        padding: '1rem 0', 
+        borderBottom: '1px solid #ecf0f1',
+        marginBottom: '1rem'
+      }}>
+        <h2 style={{ margin: 0, color: '#2c3e50' }}>Excel Skills Interview</h2>
+        <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d' }}>
+          Session: {sessionId.substring(0, 8)}...
+        </p>
+      </header>
 
-      <div className="question-card">
-        <div className="question-header">
-          <h2>{currentQuestion.title}</h2>
-          <div className="question-meta">
-            <span className="difficulty">{currentQuestion.difficulty}</span>
-            <span className="category">{currentQuestion.category}</span>
-            <span className="points">{currentQuestion.points} points</span>
-          </div>
-        </div>
-
-        <div className="question-content">
-          <p>{currentQuestion.description}</p>
-        </div>
-
-        <form onSubmit={handleSubmitAnswer} className="answer-form">
-          <div className="form-group">
-            <label htmlFor="answer">Your Answer:</label>
-            <textarea
-              id="answer"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Enter your answer here..."
-              rows={6}
-              required
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            className="submit-button"
-            disabled={submitting}
+      <div style={{ 
+        flex: 1, 
+        overflowY: 'auto', 
+        padding: '1rem',
+        border: '1px solid #ecf0f1',
+        borderRadius: '8px',
+        marginBottom: '1rem'
+      }}>
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              borderRadius: '8px',
+              backgroundColor: message.type === 'ai' ? '#e8f4fd' : '#f8f9fa',
+              border: `1px solid ${message.type === 'ai' ? '#3498db' : '#dee2e6'}`
+            }}
           >
-            <Send size={16} />
-            {submitting ? 'Submitting...' : 'Submit Answer'}
-          </button>
-        </form>
+            <div style={{ 
+              fontWeight: 'bold', 
+              marginBottom: '0.5rem',
+              color: message.type === 'ai' ? '#2980b9' : '#495057'
+            }}>
+              {message.type === 'ai' ? '🤖 AI Interviewer' : '👤 You'}
+            </div>
+            <div style={{ 
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.5'
+            }}>
+              {message.content}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div style={{ 
+            padding: '1rem', 
+            textAlign: 'center', 
+            color: '#7f8c8d' 
+          }}>
+            AI is thinking...
+          </div>
+        )}
       </div>
+
+      {error && (
+        <div style={{ 
+          color: '#e74c3c', 
+          padding: '0.75rem', 
+          backgroundColor: '#fadbd8', 
+          border: '1px solid #e74c3c',
+          borderRadius: '4px',
+          marginBottom: '1rem'
+        }}>
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={sendMessage} style={{ display: 'flex', gap: '0.5rem' }}>
+        <input
+          type="text"
+          value={currentMessage}
+          onChange={(e) => setCurrentMessage(e.target.value)}
+          placeholder="Type your response here..."
+          disabled={loading}
+          style={{
+            flex: 1,
+            padding: '0.75rem',
+            border: '1px solid #bdc3c7',
+            borderRadius: '4px',
+            fontSize: '1rem'
+          }}
+        />
+        <button
+          type="submit"
+          disabled={loading || !currentMessage.trim()}
+          style={{
+            backgroundColor: loading ? '#bdc3c7' : '#3498db',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Send
+        </button>
+        <button
+          type="button"
+          onClick={finishInterview}
+          style={{
+            backgroundColor: '#27ae60',
+            color: 'white',
+            padding: '0.75rem 1rem',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Finish
+        </button>
+      </form>
     </div>
   );
-};
+}
 
 export default InterviewPage;

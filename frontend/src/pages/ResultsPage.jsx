@@ -1,151 +1,152 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getSessionResults } from '../utils/api';
-import { Award, TrendingUp, RotateCcw, Home } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const ResultsPage = () => {
-  const { sessionId } = useParams();
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function ResultsPage() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [results, setResults] = useState(null);
+  const { sessionId, candidateEmail } = location.state || {};
+
+  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadResults();
-  }, [sessionId]);
+    if (!sessionId) {
+      navigate('/');
+      return;
+    }
 
-  const loadResults = async () => {
+    fetchReport();
+  }, [sessionId, navigate]);
+
+  const fetchReport = async () => {
     try {
-      const data = await getSessionResults(sessionId);
-      setResults(data);
-    } catch (error) {
-      console.error('Failed to load results:', error);
+      console.log('Fetching report for session:', sessionId);
+      
+      const response = await axios.get(`${API_BASE_URL}/api/interviews/report/${sessionId}`);
+      console.log('Report data:', response.data);
+      
+      setReport(response.data);
+    } catch (err) {
+      console.error('Error fetching report:', err);
+      setError(
+        err.response?.data?.detail || 
+        err.message || 
+        'Failed to load interview report.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const getScoreColor = (percentage) => {
-    if (percentage >= 80) return 'excellent';
-    if (percentage >= 60) return 'good';
-    if (percentage >= 40) return 'average';
-    return 'needs-improvement';
+  const startNewInterview = () => {
+    navigate('/');
   };
+
+  if (!sessionId) {
+    return <div>Loading...</div>;
+  }
 
   if (loading) {
     return (
-      <div className="results-container">
-        <div className="loading-card">
-          <div className="spinner"></div>
-          <p>Loading your results...</p>
-        </div>
+      <div style={{ 
+        maxWidth: '600px', 
+        margin: '0 auto', 
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <h2>Generating Your Report...</h2>
+        <p>Please wait while we analyze your interview responses.</p>
       </div>
     );
   }
 
-  if (!results) {
+  if (error) {
     return (
-      <div className="results-container">
-        <div className="error-card">
-          <h2>Results Not Available</h2>
-          <p>Unable to load your interview results.</p>
-          <button onClick={() => navigate('/')}>
-            <Home size={16} />
-            Go Home
-          </button>
-        </div>
+      <div style={{ 
+        maxWidth: '600px', 
+        margin: '0 auto', 
+        padding: '2rem'
+      }}>
+        <h2 style={{ color: '#e74c3c' }}>Error</h2>
+        <p>{error}</p>
+        <button 
+          onClick={startNewInterview}
+          style={{
+            backgroundColor: '#3498db',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Start New Interview
+        </button>
       </div>
     );
   }
-
-  const scorePercentage = Math.round((results.totalScore / results.maxScore) * 100);
 
   return (
-    <div className="results-container">
-      <div className="results-header">
-        <Award size={48} className="results-icon" />
-        <h1>Interview Results</h1>
-        <p>Here's how you performed in the Excel interview</p>
+    <div style={{ 
+      maxWidth: '800px', 
+      margin: '0 auto', 
+      padding: '2rem'
+    }}>
+      <h1 style={{ textAlign: 'center', color: '#2c3e50' }}>
+        Interview Results
+      </h1>
+      
+      <div style={{ 
+        padding: '1.5rem', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '8px',
+        marginBottom: '2rem'
+      }}>
+        <h3 style={{ margin: '0 0 1rem 0' }}>Session Details</h3>
+        <p><strong>Email:</strong> {candidateEmail}</p>
+        <p><strong>Session ID:</strong> {sessionId}</p>
+        <p><strong>Status:</strong> {report?.status || 'Completed'}</p>
       </div>
 
-      <div className="score-summary">
-        <div className={`score-circle ${getScoreColor(scorePercentage)}`}>
-          <div className="score-value">
-            <span className="percentage">{scorePercentage}%</span>
-            <span className="score-text">
-              {results.totalScore} / {results.maxScore} points
-            </span>
-          </div>
-        </div>
-
-        <div className="performance-level">
-          <h3>Performance Level</h3>
-          <p className={getScoreColor(scorePercentage)}>
-            {scorePercentage >= 80 && 'Excellent'}
-            {scorePercentage >= 60 && scorePercentage < 80 && 'Good'}
-            {scorePercentage >= 40 && scorePercentage < 60 && 'Average'}
-            {scorePercentage < 40 && 'Needs Improvement'}
-          </p>
+      <div style={{ 
+        padding: '1.5rem', 
+        backgroundColor: '#ffffff', 
+        border: '1px solid #ecf0f1',
+        borderRadius: '8px',
+        marginBottom: '2rem'
+      }}>
+        <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Assessment Report</h3>
+        <div style={{ 
+          whiteSpace: 'pre-wrap',
+          lineHeight: '1.6',
+          color: '#34495e'
+        }}>
+          {report?.report || 'Report content not available.'}
         </div>
       </div>
 
-      {results.responses && results.responses.length > 0 && (
-        <div className="detailed-results">
-          <h2>Question-by-Question Breakdown</h2>
-
-          {results.responses.map((response, index) => (
-            <div key={response.questionId} className="response-card">
-              <div className="response-header">
-                <h3>Question {index + 1}</h3>
-                <span className="response-score">
-                  {response.score || 0} / {response.maxPoints || 10} points
-                </span>
-              </div>
-
-              <div className="response-content">
-                <div className="question-title">
-                  <strong>{response.questionTitle}</strong>
-                </div>
-
-                <div className="user-answer">
-                  <h4>Your Answer:</h4>
-                  <p>{response.userResponse}</p>
-                </div>
-
-                {response.feedback && (
-                  <div className="ai-feedback">
-                    <h4>AI Feedback:</h4>
-                    <p>{response.feedback}</p>
-                  </div>
-                )}
-
-                {response.expectedAnswer && (
-                  <div className="expected-answer">
-                    <h4>Expected Answer:</h4>
-                    <p>{response.expectedAnswer}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="results-actions">
-        <button onClick={() => navigate('/')} className="home-button">
-          <Home size={16} />
-          Back to Home
-        </button>
-
+      <div style={{ textAlign: 'center' }}>
         <button 
-          onClick={() => window.location.reload()} 
-          className="retry-button"
+          onClick={startNewInterview}
+          style={{
+            backgroundColor: '#3498db',
+            color: 'white',
+            padding: '0.75rem 2rem',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
         >
-          <RotateCcw size={16} />
-          View Results Again
+          Start New Interview
         </button>
       </div>
     </div>
   );
-};
+}
 
 export default ResultsPage;

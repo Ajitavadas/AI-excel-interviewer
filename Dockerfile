@@ -25,7 +25,10 @@ RUN pip install --upgrade pip && \
     pip install -r ./backend/requirements.txt
 
 # Copy backend application code
-COPY backend/ ./backend/
+COPY backend/ ./
+
+# Create logs directory
+RUN mkdir -p /app/logs
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -40,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Default command
-CMD ["python", "backend/main.py"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

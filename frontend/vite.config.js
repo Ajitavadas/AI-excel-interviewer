@@ -9,6 +9,14 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    // Add proxy configuration for development
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   build: {
     outDir: 'dist',
