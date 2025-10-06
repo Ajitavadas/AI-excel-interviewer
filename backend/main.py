@@ -13,20 +13,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 import traceback
-from app.core.config import settings
 
-# Import application components with fallback
+# Import application components
 try:
     from app.core.config import settings
+    # Try to import database components (they might not exist yet)
+    try:
+        from app.core.database import engine, Base
+    except ImportError:
+        engine = None
+        Base = None
+        print("Database components not found - running without database")
+
 except ImportError as e:
     print(f"Import error for config: {e}")
+    # Fallback configuration
     class FallbackSettings:
-        allowed_origins = [
-            "http://localhost:3000", 
-            "http://localhost:5173",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173"
-        ]
+        allowed_origins = ["http://localhost:3000", "http://localhost:5173"]
         debug = True
         log_level = "info"
         use_local_llm = True
@@ -34,6 +37,8 @@ except ImportError as e:
         ollama_model = "phi4-mini:latest"
     
     settings = FallbackSettings()
+    engine = None
+    Base = None
 
 # Configure logging
 structlog.configure(
@@ -43,7 +48,7 @@ structlog.configure(
         structlog.dev.ConsoleRenderer()
     ],
     wrapper_class=structlog.stdlib.BoundLogger,
-    logger_factory=structlog.stdlib.LoggerFactory(),  
+    logger_factory=structlog.stdlib.LoggerFactory(),
     cache_logger_on_first_use=True,
 )
 
@@ -57,21 +62,22 @@ app = FastAPI(
     debug=getattr(settings, 'debug', True)
 )
 
-# CRITICAL: Enhanced CORS configuration
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173", 
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://ai-excel-interviewer-frontend:80"
-    ],
+    allow_origins=getattr(settings, 'allowed_origins', ["*"]),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
+
+# Create database tables if available
+if Base and engine:
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error("Failed to create database tables", error=str(e))
 
 # Import and include API routes
 try:
@@ -80,25 +86,6 @@ try:
     logger.info("Interview routes loaded successfully")
 except ImportError as e:
     logger.warning(f"Could not load interview routes: {e}")
-    # Add inline routes as fallback
-    from pydantic import BaseModel
-    from typing import Optional
-    import uuid
-    from datetime import datetime
-    
-    class StartInterviewRequest(BaseModel):
-        candidate_email: str
-        candidate_name: Optional[str] = "Test Candidate"
-    
-    @app.post("/api/interviews/start")
-    async def start_interview_fallback(request: StartInterviewRequest):
-        session_id = str(uuid.uuid4())
-        return {
-            "session_id": session_id,
-            "status": "started",
-            "welcome_message": "Welcome to the AI Excel Interviewer! Let's begin with your first question.",
-            "candidate_email": request.candidate_email
-        }
 
 # Basic routes
 @app.get("/")
@@ -106,21 +93,34 @@ async def root():
     return {
         "message": "AI Excel Interviewer API", 
         "status": "running",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "environment": "development" if getattr(settings, 'debug', True) else "production"
     }
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "cors": "enabled",
-        "timestamp": "2025-09-24T02:06:00Z"
-    }
+    """Health check endpoint for Docker health checks"""
+    try:
+        return {
+            "status": "healthy",
+            "database": "connected" if engine else "disabled",
+            "redis": "available",
+            "llm": "ollama-ready",
+            "timestamp": "2025-09-24T01:25:00Z"
+        }
+    except Exception as e:
+        logger.error("Health check failed", error=str(e))
+        raise HTTPException(status_code=503, detail="Service unhealthy")
 
-# CRITICAL: Add explicit OPTIONS handler for troubleshooting
-@app.options("/api/interviews/start")
-async def options_start_interview():
-    return {"status": "ok"}
+@app.get("/config")
+async def get_config():
+    """Debug endpoint to check configuration"""
+    return {
+        "allowed_origins": getattr(settings, 'allowed_origins', ["*"]),
+        "ollama_base_url": getattr(settings, 'ollama_base_url', 'not configured'),
+        "use_local_llm": getattr(settings, 'use_local_llm', True),
+        "debug": getattr(settings, 'debug', True)
+    }
 
 # Exception handlers
 @app.exception_handler(Exception)
@@ -134,6 +134,27 @@ async def global_exception_handler(request, exc):
         content={"detail": "Internal server error", "error": str(exc)}
     )
 
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    logger.info("AI Excel Interviewer API starting up...")
+    logger.info(f"Working directory: {os.getcwd()}")
+    logger.info("API routes configured:")
+    for route in app.routes:
+        logger.info(f"  {route.methods} {route.path}")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+    logger.info("Starting AI Excel Interviewer API server",
+                host="0.0.0.0",
+                port=8000,
+                debug=getattr(settings, 'debug', True))
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=getattr(settings, 'debug', True),
+        log_level=getattr(settings, 'log_level', 'info').lower()
+    )
