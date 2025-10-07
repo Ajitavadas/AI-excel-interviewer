@@ -38,7 +38,7 @@ class LLMService:
                         "messages": messages,
                         "stream": False,
                         "options": {
-                            "temperature": 0.7,
+                            "temperature": 0.2,
                             "top_p": 0.9
                         }
                     }
@@ -46,6 +46,7 @@ class LLMService:
                 
                 if response.status_code == 200:
                     result = response.json()
+                    logger.info(f"Ollama response: {result}")  # Temporary logging
                     return result.get("message", {}).get("content", "I'm sorry, I couldn't generate a response.")
                 else:
                     logger.error(f"Ollama API error: {response.status_code} - {response.text}")
