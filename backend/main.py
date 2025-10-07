@@ -34,7 +34,7 @@ except ImportError as e:
         log_level = "info"
         use_local_llm = True
         ollama_base_url = "http://ollama:11434"
-        ollama_model = "phi4-mini:latest"
+        ollama_model = "gemma3:1b"
     
     settings = FallbackSettings()
     engine = None

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # LLM Configuration
     use_local_llm: bool = True
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "phi4-mini:latest"
+    ollama_model: str = "gemma3:1b"
     
     # Application Configuration
     secret_key: str = "your-secret-key-change-in-production"

@@ -13,7 +13,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - OLLAMA_BASE_URL=http://ollama:11434
       - USE_LOCAL_LLM=true
-      - OLLAMA_MODEL=phi4-mini:latest
+      - OLLAMA_MODEL=gemma3:1b
       - SECRET_KEY=your-secret-key-change-in-production
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://ai-excel-interviewer-frontend:80
       - DEBUG=true

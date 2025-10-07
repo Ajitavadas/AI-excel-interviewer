@@ -10,8 +10,8 @@ class LLMService:
     def __init__(self):
         self.use_local = getattr(settings, 'use_local_llm', True)
         self.base_url = getattr(settings, 'ollama_base_url', 'http://ollama:11434')
-        self.model = getattr(settings, 'ollama_model', 'phi4-mini:latest')
-        self.timeout = 30.0
+        self.model = getattr(settings, 'ollama_model', 'gemma3:1b')
+        self.timeout = 120.0
     
     async def generate_response(self, prompt: str, system_message: Optional[str] = None) -> str:
         """Generate response using configured LLM"""

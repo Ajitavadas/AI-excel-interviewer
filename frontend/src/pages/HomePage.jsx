@@ -27,7 +27,7 @@ function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 10000
+        timeout: 120000
       });
 
       console.log('Interview started:', response.data);
