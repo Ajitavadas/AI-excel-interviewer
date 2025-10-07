@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function InterviewPage() {
+  const { sessionId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { sessionId, welcomeMessage, candidateEmail } = location.state || {};
+  const { welcomeMessage, candidateEmail } = location.state || {};
 
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -57,7 +58,7 @@ function InterviewPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 30000
+        timeout: 3000000
       });
 
       console.log('AI response:', response.data);

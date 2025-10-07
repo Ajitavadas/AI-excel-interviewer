@@ -33,7 +33,7 @@ function HomePage() {
       console.log('Interview started:', response.data);
       
       // Navigate to interview page with session data
-      navigate('/interview', { 
+      navigate(`/interview/${response.data.session_id}`, { 
         state: { 
           sessionId: response.data.session_id,
           welcomeMessage: response.data.welcome_message,
