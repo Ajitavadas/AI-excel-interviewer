@@ -84,7 +84,7 @@ function InterviewPage() {
   };
 
   const finishInterview = () => {
-    navigate('/results', { 
+    navigate(`/results/${sessionId}`, {  
       state: { 
         sessionId,
         candidateEmail 
